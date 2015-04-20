@@ -9,6 +9,7 @@ from time import sleep # be nice
 import re
 import os
 import unicodedata
+import numpy as np
 
 
 # In[135]:
@@ -39,9 +40,14 @@ def get_faculty_links(section_url):
     lnames = [] #list for last namesdegree,
     
     td = soup.findAll("td", { "class":"people-list-name" })
-    for i in range(len(td)): 
-        lnames.append(td[i].find('strong'))
-        fnames.append(td[i].a.text)
+    for i in range(len(td)):  #for each td tag
+        last = td[i].find('strong').text  #last name are in the strong tags
+        #first names are in the a tags excluding the strong tags
+        first = ''.join(text for text in td[i].a.find_all(text=True) if text.parent.name != "strong")
+        #decode unicode data
+        lnames.append(unicodedata.normalize('NFKD', last).encode('ascii','ignore'))
+        fnames.append(unicodedata.normalize('NFKD', first).encode('ascii','ignore'))
+        #find the faculty_links for each faculty
         for a in td[i].find_all('a', href=True):
             faculty_links.append(a['href'])
             
@@ -49,150 +55,82 @@ def get_faculty_links(section_url):
 
 # Get PhD information
 def get_faculty_info(faculty_url):
-    soup = make_soup(faculty_url)
-    if (soup != None):
+    soup = make_soup(faculty_url)  #go into each faculty_link
+    if (soup != None): 
+        #find the div tag with profile-degrees
         div = soup.find("div", { "class":"profile-degrees" })
-        if (div == None):
-            div_new = soup.find("div", { "class":"rule" }).text
-            degree = unicodedata.normalize('NFKD', div).encode('ascii','ignore')
-            PhD = get_phd(degree)
-#             PhD = "Not on this page"
-        else:
-            ul = div.find('ul').text
+        if (div != None): #if there is a div tag with the class specified
+            ul = div.find('ul').text  #find the degree info in the list
             degree = unicodedata.normalize('NFKD', ul).encode('ascii','ignore')
-            degree = re.sub(r'\d', "", degree)
-            if (re.search('Ph', degree, re.IGNORECASE) != None): 
-                if (re.search('MIT', degree, re.IGNORECASE) != None): 
-                    PhD = "Massachusetts Institute of Technology"
-                elif (len(degree.split(',')) > 1):
-                    if (re.search('university', degree, re.IGNORECASE) != None) or (re.search('institute', degree, re.IGNORECASE) != None):
-                        for j in range(len(degree.split(','))): 
-                            if (re.search('university', degree.split(',')[j], re.IGNORECASE) != None) or (re.search('institute', degree.split(',')[j], re.IGNORECASE) != None):
-                                PhD = degree.split(',')[j]
-                    else:
-                        ph = re.search('Ph', degree, re.IGNORECASE)
-                        end = ph.end()+2
-                        PhD = degree[end:]
-                        PhD = re.sub(r'\d', "", PhD) #take out the year
-            else:
-                PhD = degree
-    else: PhD = "Page not accessible"
-    print PhD
+            PhD = get_phd(degree)
+        else: #if there is no div with the specified class
+            PhD = "Not on this page" #degree info is not on this page
+    else: PhD = "Page not accessible" #if can not access soup, tell me
     return PhD
 
+# text scrapy for phd info
 def get_phd(degree):
-    degree = re.sub(r'\d', "", degree)
-    if (re.search('Ph', degree, re.IGNORECASE) != None): 
+    degree = re.sub(r'\d', "", degree) #take the year off
+    if (re.search('Ph', degree, re.IGNORECASE) != None):  #if there is a "Ph"
         if (re.search('MIT', degree, re.IGNORECASE) != None): 
-            PhD = "Massachusetts Institute of Technology"
-        elif (len(degree.split(',')) > 1):
+            PhD = "Massachusetts Institute of Technology" #fix MIT problem
+        # if there are commas, split them and go through each part
+        elif (len(degree.split(',')) > 1): 
             if (re.search('university', degree, re.IGNORECASE) != None) or (re.search('institute', degree, re.IGNORECASE) != None):
                 for j in range(len(degree.split(','))): 
                     if (re.search('university', degree.split(',')[j], re.IGNORECASE) != None) or (re.search('institute', degree.split(',')[j], re.IGNORECASE) != None):
-                        PhD = degree.split(',')[j]
-            else:
+                        PhD = degree.split(',')[j] #take the part with keyword 'university' or 'institute'
+            else: #if no keyword is there, clean up as much as possible
                 ph = re.search('Ph', degree, re.IGNORECASE)
                 end = ph.end()+2
                 PhD = degree[end:]
                 PhD = re.sub(r'\d', "", PhD) #take out the year
-    else:
+    else: #if there is no "Ph" in the text, take the whole thing just in case
         PhD = degree
-    return "irregular page:" + PhD
-
-
-# In[5]:
-
-url  = ("https://engineering.purdue.edu/ECE/People/Faculty")
-fnames, lnames, faculty_links, department, university = get_faculty_links(url)
+    return PhD
 
 
 # In[136]:
 
-data = [] # a list to faculty info
+# extract name, faculty url, department and university from the directory website
+url  = ("https://engineering.purdue.edu/ECE/People/Faculty")
+fnames, lnames, faculty_links, department, university = get_faculty_links(url)
+
+
+# In[5]:
+
+# extract gradate school information from each faculty page
+grad_school = [] # a list to faculty info
 for i in range(len(faculty_links)): 
     faculty = faculty_links[i]
-    print i
+#     print i
     PhD = get_faculty_info(faculty).strip()
 #     print PhD
-    data.append(PhD)
+    grad_school.append(PhD)
     #sleep(1) # be nice
 
-print data
+# print grad_school
 
 
 # In[137]:
 
-link = faculty_links[15]
-print link
-# soup = make_soup(link)
-
-# print link
-# div = soup.find("div", { "class":"profile-degrees" })
-# print div == None
-# # ul = div.find('ul').text
-# # ul
-# # #
-
-# PhD = get_faculty_info(faculty_links[0])
+# make department and school same length as the other columns
+depart = []
+school = []
+for i in range(len(fnames)):
+    depart.append(department)
+    school.append(university)
 
 
-# # PhD = re.sub('[\,]', "", PhD)
-# # PhD = PhD.strip(',')
-# print PhD
+# In[138]:
 
-# print re.search('MIT', PhD, re.IGNORECASE) != None
+# put all lists together
+faculty = fnames, lnames, grad_school, school, depart
 
-
-# degree = unicodedata.normalize('NFKD', ul).encode('ascii','ignore')
-
-# a = re.search('Ph', degree, re.IGNORECASE)
-# a.group()
-# end = a.end()+3
-# len(degree)
-# degree[end:].split(',')[0]
-
-# if (soup.find("div", { "class":"profile-degrees" }) == None ):
-#     PhD = "not on this page"
-# else:
-#     div = soup.find("div", { "class":"profile-degrees" }).text
-#     print div
-#     if (re.search(',', div) == None): 
-#         PhD = div
-#     else:
-#         PhD = " ".join(div.split(',')[1].split(',')[0].split())
-
-
-
-soup = make_soup(faculty_links[61])
-if (soup != None):
-    div = soup.find("div", { "class":"profile-degrees" })
-    if (div == None ):
-        PhD = "Not on this page"
-    else:
-        ul = div.find('ul').text
-        degree = unicodedata.normalize('NFKD', ul).encode('ascii','ignore')  
-
-        if (re.search('Ph', degree, re.IGNORECASE) != None): 
-            if (re.search('MIT', degree, re.IGNORECASE) != None): 
-                PhD = "Massachusetts Institute of Technology"
-            
-            elif (len(degree.split(',')) > 1):
-                if (re.search('university', degree, re.IGNORECASE) != None) or (re.search('Institute', degree, re.IGNORECASE) != None):
-                    for j in range(len(degree.split(','))): 
-                        if (re.search('university', degree.split(',')[j], re.IGNORECASE) != None) or (re.search('institute', degree.split(',')[j], re.IGNORECASE) != None):
-                            PhD = degree.split(',')[j]
-                else:
-                    ph = re.search('Ph', degree, re.IGNORECASE)
-                    end = ph.end()+2
-                    PhD = degree[end:]
-                    PhD = re.sub(r'\d', "", PhD) #take out the year
-        else:
-            PhD = degree
-else: PhD = "Page not accessible"
-# print PhD
-
-PhD
-
-# print re.search('mit', PhD, re.IGNORECASE) != None
-# print re.search('Ph', PhD, re.IGNORECASE) == True
+# output to a csv file, results needs to be transposed as the list is by default verticalled stacked
+import csv
+with open("faculty_purdue.csv", "wb") as f:
+    writer = csv.writer(f) 
+    for row in faculty:
+        writer.writerow(row)
 
