@@ -1,0 +1,8 @@
+pID	abstract
+1	data science
+2	science books
+3	education books
+4	statistics test
+5	statistics education
+6	house income
+7	income inequality
